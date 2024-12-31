@@ -141,6 +141,15 @@ void ANetBaseCharacter::CheckPlayerState()
     }
 }
 
+void ANetBaseCharacter::SubmitPlayerInfoToServer_Implementation(FSPlayerInfo Info)
+{
+    ANetPlayerState* State = GetPlayerState<ANetPlayerState>();
+    State->Data.Nickname = Info.Nickname;
+    State->Data.CustomizationData = Info.CustomizationData;
+    State->Data.TeamID = State->TeamID;
+    PlayerInfoReceived = true;
+}
+
 void ANetBaseCharacter::CheckPlayerInfo()
 {
     ANetPlayerState* State = GetPlayerState<ANetPlayerState>();
