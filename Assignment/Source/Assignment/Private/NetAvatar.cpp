@@ -31,9 +31,6 @@ void ANetAvatar::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent
     PlayerInputComponent->BindAxis("LookUp", this, &ACharacter::AddControllerPitchInput);
     PlayerInputComponent->BindAxis("MoveForward", this, &ANetAvatar::MoveForward);
     PlayerInputComponent->BindAxis("MoveRight", this, &ANetAvatar::MoveRight);
-
-    PlayerInputComponent->BindAction("Run", IE_Pressed, this, &ANetAvatar::StartRun);
-    PlayerInputComponent->BindAction("Run", IE_Released, this, &ANetAvatar::StopRun);
 }
 
 void ANetAvatar::MoveForward(float Scale)
@@ -52,20 +49,3 @@ void ANetAvatar::MoveRight(float Scale)
     AddMovementInput(RightDirection, Scale);
 }
 
-void ANetAvatar::StartRun()
-{
-    UCharacterMovementComponent* MovementComponent = GetCharacterMovement();
-    if (MovementComponent)
-    {
-        MovementComponent->MaxWalkSpeed *= 1.5f;
-    }
-}
-
-void ANetAvatar::StopRun()
-{
-    UCharacterMovementComponent* MovementComponent = GetCharacterMovement();
-    if (MovementComponent)
-    {
-        MovementComponent->MaxWalkSpeed /= 1.5f;
-    }
-}
