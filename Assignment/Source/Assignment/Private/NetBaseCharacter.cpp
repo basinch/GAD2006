@@ -1,6 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "NetBaseCharacter.h"
+#include "NetPlayerState.h"
 #include "NetGameInstance.h"
 
 
@@ -59,17 +60,12 @@ void ANetBaseCharacter::BeginPlay()
 {
     Super::BeginPlay();
 
-    if (IsLocallyControlled())
-    {
-        UNetGameInstance* Instance = Cast<UNetGameInstance>(GetGameInstance());
-        if (Instance && Instance->PlayerInfo.Ready)
-        {
-            SubmitPlayerInfoToServer(Instance->PlayerInfo);
-        }
-    }
+    if (GetNetMode() == NM_Standalone) return;
+    SetActorHiddenInGame(true);
+    CheckPlayerState();
 }
 
-void ANetBaseCharacter::OnConstruction(const FTransform& Transform)
+void ANetBaseCharacter::OnConstruction(FTransform const& Transform)
 {
     UpdateBodyParts();
 }
@@ -81,10 +77,10 @@ void ANetBaseCharacter::Tick(float DeltaTime)
 
 void ANetBaseCharacter::ChangeBodyPart(EBodyPart index, int value, bool DirectSet)
 {
-    FSMeshAssetList* List = GetBodyPartList(index, PartSelection.isFemale);
+    FSMeshAssetList* List = GetBodyPartList(index, BodyPartIndices[static_cast<int>(EBodyPart::BP_BodyType)] != 0);
     if (List == nullptr) return;
 
-    int CurrentIndex = PartSelection.Indices[(int)index];
+    int CurrentIndex = BodyPartIndices[(int)index];
 
     if (DirectSet)
     {
@@ -106,7 +102,7 @@ void ANetBaseCharacter::ChangeBodyPart(EBodyPart index, int value, bool DirectSe
         CurrentIndex %= Num;
     }
 
-    PartSelection.Indices[(int)index] = CurrentIndex;
+    BodyPartIndices[(int)index] = CurrentIndex;
 
     switch (index)
     {
@@ -120,9 +116,75 @@ void ANetBaseCharacter::ChangeBodyPart(EBodyPart index, int value, bool DirectSe
     }
 }
 
+void ANetBaseCharacter::CheckPlayerState()
+{
+    ANetPlayerState* State = GetPlayerState<ANetPlayerState>();
+
+    if (State == nullptr)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("State == nullptr"));
+
+        GWorld->GetTimerManager().SetTimer(ClientDataCheckTimer, this, &ANetBaseCharacter::CheckPlayerState, 0.25f,
+            false);
+    }
+    else
+    {
+        if (IsLocallyControlled())
+        {
+            UNetGameInstance* Instance = Cast<UNetGameInstance>(GWorld->GetGameInstance());
+            if (Instance)
+            {
+                SubmitPlayerInfoToServer(Instance->PlayerInfo);
+            }
+        }
+        CheckPlayerInfo();
+    }
+}
+
+void ANetBaseCharacter::CheckPlayerInfo()
+{
+    ANetPlayerState* State = GetPlayerState<ANetPlayerState>();
+
+    if (State && PlayerInfoReceived)
+    {
+        ParseCustomizationData(State->Data.CustomizationData);
+        UpdateBodyParts();
+        OnPlayerInfoChanged();
+        SetActorHiddenInGame(false);
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("State Not Received!"));
+        GWorld->GetTimerManager().SetTimer(ClientDataCheckTimer, this, &ANetBaseCharacter::CheckPlayerInfo, 0.25f, false);
+    }
+}
+
+FString ANetBaseCharacter::GetCustomizationData()
+{
+    FString Data;
+    for (size_t i = 0; i < static_cast<int>(EBodyPart::BP_BodyType); i++)
+    {
+        Data += FString::FromInt(BodyPartIndices[i]);
+        if (i < (static_cast<int>(EBodyPart::BP_COUNT)-1.0f))
+        {
+            Data += TEXT(",");
+        }
+    }
+    return Data;
+}
+
+void ANetBaseCharacter::ParseCustomizationData(FString BodyPartData)
+{
+    TArray<FString> ArrayData;
+    BodyPartData.ParseIntoArray(ArrayData, TEXT(","));
+    for (size_t i = 0; i < ArrayData.Num(); i++)
+    {
+        BodyPartIndices[i] = FCString::Atoi(*ArrayData[i]);
+    }
+}
+
 void ANetBaseCharacter::ChangeGender(bool _isFemale)
 {
-    PartSelection.isFemale = _isFemale;
     UpdateBodyParts();
 }
 
@@ -135,60 +197,38 @@ FSMeshAssetList* ANetBaseCharacter::GetBodyPartList(EBodyPart part, bool isFemal
 void ANetBaseCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
     Super::SetupPlayerInputComponent(PlayerInputComponent);
-
 }
 
-void ANetBaseCharacter::OnRep_PlayerInfoChanged()
-{
-    UpdateBodyParts();
-}
+//TArray<EBodyPart> ANetBaseCharacter::GetAllBodyParts() const
+//{
+//    TArray<EBodyPart> BodyParts;
+//    for (int32 i = 0; i < static_cast<int32>(EBodyPart::BP_COUNT); ++i)
+//    {
+//        BodyParts.Add(static_cast<EBodyPart>(i));
+//    }
+//    return BodyParts;
+//}
 
-TArray<EBodyPart> ANetBaseCharacter::GetAllBodyParts() const
-{
-    TArray<EBodyPart> BodyParts;
-    for (int32 i = 0; i < static_cast<int32>(EBodyPart::BP_COUNT); ++i)
-    {
-        BodyParts.Add(static_cast<EBodyPart>(i));
-    }
-    return BodyParts;
-}
-
-void ANetBaseCharacter::RandomizeButton()
-{
-    auto BodyParts = GetAllBodyParts();
-
-    for (const EBodyPart& Part : BodyParts) 
-    {
-        if (FSMeshAssetList* List = GetBodyPartList(Part, PartSelection.isFemale))
-        {
-            int32 NumSkeletalMeshes = List->ListSkeletal.Num();
-            int32 NumStaticMeshes = List->ListStatic.Num();
-            int32 NumOptions = NumSkeletalMeshes + NumStaticMeshes;
-
-            if (NumOptions > 0)
-            {
-                int32 RandomIndex = FMath::RandRange(0, NumOptions - 1);
-                ChangeBodyPart(Part, RandomIndex, true);
-            }
-        }
-    }
-}
-
-void ANetBaseCharacter::SubmitPlayerInfoToServer_Implementation(FSPlayerInfo Info)
-{
-    PartSelection = Info.BodyParts;
-
-    if (HasAuthority())
-    {
-        OnRep_PlayerInfoChanged();
-    }
-}
-
-void ANetBaseCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
-{
-    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-    DOREPLIFETIME(ANetBaseCharacter, PartSelection);
-}
+//void ANetBaseCharacter::RandomizeButton()
+//{
+//    auto BodyParts = GetAllBodyParts();
+//
+//    for (const EBodyPart& Part : BodyParts) 
+//    {
+//        if (FSMeshAssetList* List = GetBodyPartList(Part, PartSelection.isFemale))
+//        {
+//            int32 NumSkeletalMeshes = List->ListSkeletal.Num();
+//            int32 NumStaticMeshes = List->ListStatic.Num();
+//            int32 NumOptions = NumSkeletalMeshes + NumStaticMeshes;
+//
+//            if (NumOptions > 0)
+//            {
+//                int32 RandomIndex = FMath::RandRange(0, NumOptions - 1);
+//                ChangeBodyPart(Part, RandomIndex, true);
+//            }
+//        }
+//    }
+//}
 
 void ANetBaseCharacter::UpdateBodyParts()
 {
