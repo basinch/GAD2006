@@ -194,6 +194,14 @@ void ANetBaseCharacter::ParseCustomizationData(FString BodyPartData)
 
 void ANetBaseCharacter::ChangeGender(bool _isFemale)
 {
+    if (_isFemale)
+    {
+        BodyPartIndices[(int)EBodyPart::BP_BodyType] = 1;
+    }
+    else
+    {
+        BodyPartIndices[(int)EBodyPart::BP_BodyType] = 0;
+    }
     UpdateBodyParts();
 }
 
@@ -218,26 +226,20 @@ void ANetBaseCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 //    return BodyParts;
 //}
 
-//void ANetBaseCharacter::RandomizeButton()
-//{
-//    auto BodyParts = GetAllBodyParts();
-//
-//    for (const EBodyPart& Part : BodyParts) 
-//    {
-//        if (FSMeshAssetList* List = GetBodyPartList(Part, PartSelection.isFemale))
-//        {
-//            int32 NumSkeletalMeshes = List->ListSkeletal.Num();
-//            int32 NumStaticMeshes = List->ListStatic.Num();
-//            int32 NumOptions = NumSkeletalMeshes + NumStaticMeshes;
-//
-//            if (NumOptions > 0)
-//            {
-//                int32 RandomIndex = FMath::RandRange(0, NumOptions - 1);
-//                ChangeBodyPart(Part, RandomIndex, true);
-//            }
-//        }
-//    }
-//}
+void ANetBaseCharacter::RandomizeButton()
+{
+    for (int i=0; i<(int)EBodyPart::BP_COUNT; i++)
+    {
+        EBodyPart Part = (EBodyPart)i;
+        FSMeshAssetList* List = GetBodyPartList(Part, (BodyPartIndices[(int)EBodyPart::BP_BodyType] != 0));
+        if (List != nullptr) 
+        {
+            int NumOptions = List->ListSkeletal.Num() + List->ListStatic.Num();
+            int RandomIndex = FMath::RandRange(0, NumOptions - 1);
+            ChangeBodyPart(Part, RandomIndex, true);         
+        }
+    }
+}
 
 void ANetBaseCharacter::UpdateBodyParts()
 {

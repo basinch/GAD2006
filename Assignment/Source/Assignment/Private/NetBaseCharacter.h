@@ -64,6 +64,9 @@ public:
     UFUNCTION(BlueprintCallable)
     void ChangeGender(bool isFemale);
 
+    UFUNCTION(BlueprintCallable)
+    void RandomizeButton();
+
     UFUNCTION(Server, Reliable)
     void SubmitPlayerInfoToServer(FSPlayerInfo Info);
 

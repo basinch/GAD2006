@@ -18,7 +18,11 @@ class ANetGameMode : public AGameModeBase
 public:
 	ANetGameMode();
 
+	virtual void BeginPlay() override;
+
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
+
+	FTimerHandle BlueWinTimer;
 
 	UFUNCTION(BlueprintCallable)
 	void AvatarsOverlapped(ANetAvatar* AvatarA, ANetAvatar* AvatarB);
@@ -26,13 +30,18 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void EndGame();
 
+	UFUNCTION(BlueprintCallable)
+	void SwapTeams();
+
+	UFUNCTION(BlueprintCallable)
+	void BlueTeamTimeout();
+
 private:
 	int TotalPlayerCount;
 	int TotalGames;
 	int PlayerStartIndex;
 
 	TArray<APlayerController*> AllPlayers;
-
 
 	AActor* GetPlayerStart(FString Name, int Index);
 

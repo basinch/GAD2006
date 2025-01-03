@@ -18,7 +18,13 @@ public:
 	ANetGameState();
 
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_Winner)
+	int TimeLeft = 30;
+
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_Winner)
 	int WinningPlayer;
+
+	UPROPERTY(BlueprintReadWrite, ReplicatedUsing = OnRep_Winner)
+	bool IsTimeLeft = true;
 
 	UFUNCTION()
 	void OnRep_Winner();
@@ -27,9 +33,12 @@ public:
 	void OnVictory();
 
 	UFUNCTION(BlueprintImplementableEvent)
+	void OnTimeout();
+
+	UFUNCTION(BlueprintImplementableEvent)
 	void OnRestart();
 
-	UFUNCTION(NetMulticast, Reliable)
+	UFUNCTION(BlueprintCallable, NetMulticast, Reliable)
 	void TriggerRestart();
 
 	UFUNCTION(BlueprintCallable)

@@ -18,18 +18,25 @@ void ANetGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(ANetGameState, WinningPlayer);
+	DOREPLIFETIME(ANetGameState, TimeLeft);
+	DOREPLIFETIME(ANetGameState, IsTimeLeft);
 }
 
 void ANetGameState::OnRep_Winner()
 {
-	if (WinningPlayer >= 0)
+	if (WinningPlayer >= 0 || TimeLeft <= 0)
 	{
+		if (TimeLeft <= 0)
+		{
+			IsTimeLeft = false;
+		}
 		OnVictory();
 	}
 }
 
 void ANetGameState::TriggerRestart_Implementation()
 {
+	TimeLeft = 30;
 	OnRestart();
 }
 

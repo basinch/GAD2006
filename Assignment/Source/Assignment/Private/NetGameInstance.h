@@ -44,6 +44,9 @@ class UNetGameInstance : public UGameInstance
 	
 public:
 
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    FString HostIP;
+
     UFUNCTION(BlueprintCallable)
     void Host(FString MapName, FSPlayerInfo PlayerInfo);
 

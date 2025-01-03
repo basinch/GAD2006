@@ -25,7 +25,6 @@ public:
 
     EPlayerTeam TeamID;
     EGameResults Result;
-
 private:
 
     UFUNCTION()

@@ -102,19 +102,92 @@ void ANetGameMode::AvatarsOverlapped(ANetAvatar* AvatarA, ANetAvatar* AvatarB)
 
 	for (APlayerController* Player : AllPlayers)
 	{
-		auto State = Player->GetPlayerState<ANetPlayerState>();
+		auto PState = Player->GetPlayerState<ANetPlayerState>();
 
-		if (State->TeamID == EPlayerTeam::TEAM_Blue)
+		if (PState->TeamID == EPlayerTeam::TEAM_Blue)
 		{
-			State->Result = EGameResults::RESULT_Lost;
+			PState->Result = EGameResults::RESULT_Lost;
 		}
 		else
 		{
-			State->Result = EGameResults::RESULT_Won;
+			PState->Result = EGameResults::RESULT_Won;
 		}
 	}
 	FTimerHandle EndGameTimerHandle;
 	GWorld->GetTimerManager().SetTimer(EndGameTimerHandle, this, &ANetGameMode::EndGame, 2.5f, false);
+}
+
+void ANetGameMode::BeginPlay()
+{
+	Super::BeginPlay();
+	GWorld->GetTimerManager().SetTimer(BlueWinTimer, this, &ANetGameMode::BlueTeamTimeout, 1.0f, false);
+}
+
+void ANetGameMode::SwapTeams()
+{
+    ANetGameState* GState = GetGameState<ANetGameState>();
+
+    for (APlayerState* PlayerState : GState->PlayerArray)
+    {
+        ANetPlayerState* NetPState = Cast<ANetPlayerState>(PlayerState);
+        if (NetPState)
+        {
+            if (NetPState->TeamID == EPlayerTeam::TEAM_Blue)
+            {
+                NetPState->TeamID = EPlayerTeam::TEAM_Red;
+            }
+            else if (NetPState->TeamID == EPlayerTeam::TEAM_Red)
+            {
+                NetPState->TeamID = EPlayerTeam::TEAM_Blue;
+            }
+        }
+
+    }
+}
+
+void ANetGameMode::BlueTeamTimeout()
+{
+	if (AllPlayers.Num() > 1)
+	{
+		if (GetGameState<ANetGameState>()->TimeLeft > 0)
+		{
+			GetGameState<ANetGameState>()->TimeLeft--;
+			GWorld->GetTimerManager().SetTimer(BlueWinTimer, this, &ANetGameMode::BlueTeamTimeout, 1.0f, false);
+		}
+		else
+		{
+			ANetGameState* GState = GetGameState<ANetGameState>();
+			for (APlayerController* Player : AllPlayers)
+			{
+				auto PState = Player->GetPlayerState<ANetPlayerState>();
+				if (PState->TeamID == EPlayerTeam::TEAM_Blue)
+				{
+					GState->WinningPlayer = PState->PlayerIndex;
+				}
+			}
+			GState->OnTimeout();
+			for (APlayerController* Player : AllPlayers)
+			{
+				auto PState = Player->GetPlayerState<ANetPlayerState>();
+				if (PState->TeamID == EPlayerTeam::TEAM_Blue)
+				{
+					PState->Result = EGameResults::RESULT_Won;
+					GState->WinningPlayer = PState->PlayerIndex;
+				}
+				else
+				{
+					PState->Result = EGameResults::RESULT_Lost;
+				}
+
+			}
+			GWorld->GetTimerManager().SetTimer(BlueWinTimer, this, &ANetGameMode::EndGame, 2.5f, false);
+			//SwapTeams();
+		}
+	}
+	else
+	{
+		GWorld->GetTimerManager().SetTimer(BlueWinTimer, this, &ANetGameMode::BlueTeamTimeout, 1.0f, false);
+	}
 }
 
 void ANetGameMode::EndGame()
@@ -129,8 +202,10 @@ void ANetGameMode::EndGame()
 		Pawn->Destroy();
 		Player->StartSpot.Reset();
 		RestartPlayer(Player);
+		GWorld->GetTimerManager().SetTimer(BlueWinTimer, this, &ANetGameMode::BlueTeamTimeout, 1.0f, false);
 	}
 
+	GetGameState<ANetGameState>()->TimeLeft = 30;
 	ANetGameState* GState = GetGameState<ANetGameState>();
 	GState->TriggerRestart();
 }
